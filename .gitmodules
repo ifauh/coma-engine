@@ -1,0 +1,3 @@
+[submodule "rq-dashboard"]
+	path = rq-dashboard
+	url = https://github.com/edubergeek/rq-dashboard.git

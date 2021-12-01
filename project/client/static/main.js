@@ -6,12 +6,12 @@ $( document ).ready(() => {
 
 $('.btn').on('click', function() {
   $.ajax({
-    url: '/tasks',
-    data: { type: $(this).data('type') },
-    method: 'POST'
+    url: '/object/images',
+    data: { type: $(this).data('object') },
+    method: 'GET'
   })
   .done((res) => {
-    getStatus(res.data.task_id);
+    getStatus(res.task.id);
   })
   .fail((err) => {
     console.log(err);
@@ -26,15 +26,15 @@ function getStatus(taskID) {
   .done((res) => {
     const html = `
       <tr>
-        <td>${res.data.task_id}</td>
-        <td>${res.data.task_status}</td>
-        <td>${res.data.task_result}</td>
+        <td>${res.task.id}</td>
+        <td>${res.task.status}</td>
+        <td>${res.task.enqueued}</td>
       </tr>`
     $('#tasks').prepend(html);
-    const taskStatus = res.data.task_status;
+    const taskStatus = res.task.status;
     if (taskStatus === 'finished' || taskStatus === 'failed') return false;
     setTimeout(function() {
-      getStatus(res.data.task_id);
+      getStatus(res.task.id);
     }, 1000);
   })
   .fail((err) => {

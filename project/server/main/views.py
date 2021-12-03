@@ -4,7 +4,7 @@ import redis
 from rq import Queue, Connection
 from flask import render_template, Blueprint, jsonify, request, current_app
 
-from project.server.main.tasks import coma_object_images
+from project.server.main.tasks import coma_object_images, coma_describe_fits
 
 main_blueprint = Blueprint("main", __name__,)
 
@@ -12,6 +12,44 @@ main_blueprint = Blueprint("main", __name__,)
 @main_blueprint.route("/", methods=["GET"])
 def home():
   return render_template("main/home.html")
+
+
+# API for list all URLs
+@main_blueprint.route("/routes/", methods=["GET"])
+def list_routes():
+  response_object = {
+      "routes": {
+        "url": "/routes/", 
+        "method": "GET",
+        "description": "List of REST API URLs",
+      },
+      "objects": {
+        "url": "/objects/", 
+        "method": "GET",
+        "description": "List of valid object IDs",
+      },
+      "object-images": {
+        "url": "/object/images/<id>/", 
+        "method": "GET",
+        "description": "List object images",
+        "<id>": "Object ID",
+      },
+      "fits-header": {
+        "url": "/fits/header/",
+        "method": "POST",
+        "description": "List FITS file header values for a fits file",
+        "fits_file": "full path of FITS file",
+      },
+  }
+  return jsonify(response_object)
+
+# API for list object ids
+@main_blueprint.route("/objects/", methods=["GET"])
+def list_objects():
+  response_object = {
+    "9p": "9P/1867 G1 (Tempel 1)",
+  }
+  return jsonify(response_object)
 
 
 #@main_blueprint.route("/tasks", methods=["POST"])
@@ -73,3 +111,28 @@ def task_object_images(obj_id):
     "task": { "id": task.get_id() },
   }
   return jsonify(response_object), 202
+
+@main_blueprint.route("/fits/header/", methods=["POST"])
+def task_fits_header():
+  fits_file = request.form["fits_file"]
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_describe_fits, fits_file)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  return jsonify(response_object), 202
+
+#@main_blueprint.route("/tasks", methods=["POST"])
+#def run_task():
+#  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+#    q = Queue()
+#    task = q.enqueue(create_task, task_type)
+#  response_object = {
+#    "status": "success",
+#    "task": { "id": task.get_id() },
+#  }
+#  return jsonify(response_object), 202
+
+

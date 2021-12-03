@@ -11,6 +11,8 @@ services:
     command: python manage.py run -h 0.0.0.0
     volumes:
       - .:/usr/src/app
+      - /COMA/bundles:/bundles
+      - /COMA/Coma:/coma
     environment:
       - FLASK_DEBUG=1
       - APP_SETTINGS=project.server.config.DevelopmentConfig
@@ -22,7 +24,7 @@ services:
     command: python manage.py run_worker
     volumes:
       - .:/usr/src/app
-      - /COMA/images:/images
+      - /COMA/bundles:/bundles
     environment:
       - APP_SETTINGS=project.server.config.DevelopmentConfig
     depends_on:

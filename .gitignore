@@ -2,6 +2,7 @@
 env
 venv
 __pycache__
+.python-version
 
 *.pyc
 *.sqlite

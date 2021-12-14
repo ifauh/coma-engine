@@ -1,6 +1,8 @@
 # base image
 FROM python:3.9.1-alpine
 
+RUN /usr/local/bin/python -m pip install --upgrade pip
+
 # set working directory
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app

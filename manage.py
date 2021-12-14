@@ -7,6 +7,9 @@ import redis
 from rq import Connection, Worker
 
 from flask.cli import FlaskGroup
+from flask_cors import CORS
+
+#from flask_cors import CORS
 
 from project.server import create_app
 
@@ -15,8 +18,18 @@ sys.path.append('/usr/src/app/coma')
 
 
 app = create_app()
-cli = FlaskGroup(create_app=create_app)
+#CORS(app)
 
+# Configure for Cross-Origin Resource Sharing (CORS)
+cors_config = {
+  "origins": ["*"],
+  "methods": ["OPTIONS", "GET", "POST"],
+  "allow_headers": ["Authorization", "Content-Type"]
+}
+#CORS(app, resources={"/": cors_config})
+#CORS(app)
+
+cli = FlaskGroup(create_app=create_app)
 
 @cli.command()
 def test():

@@ -96,7 +96,7 @@ def coma_object_images(obj_id):
   # iterate over files in that directory
   for root, dirs, files in os.walk(directory):
     for filename in files:
-      image_files.append(os.path.join(root, filename))
+      image_files.append("/COMA" + os.path.join(root, filename))
 
   response = json.dumps(image_files)
   return response
@@ -104,5 +104,12 @@ def coma_object_images(obj_id):
 TheCOMAAPI = COMAAPI()
 
 def coma_describe_fits(fits):
+  job = get_current_job()
+  TheCOMAAPI.SetUUID(job.id)
   return TheCOMAAPI.DescribeFits(fits)
+
+def coma_fits_photometry(fits, objid, method, aperture):
+  job = get_current_job()
+  TheCOMAAPI.SetUUID(job.id)
+  return TheCOMAAPI.FitsPhotometry(fits, objid, method, aperture)
 

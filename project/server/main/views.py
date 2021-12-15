@@ -7,7 +7,7 @@ from flask_cors import CORS
 
 import json
 
-from project.server.main.tasks import coma_object_images, coma_describe_fits
+from project.server.main.tasks import coma_object_images, coma_describe_fits, coma_fits_photometry
 
 def job_tasks(job):
   job_def = json.loads(job)
@@ -67,6 +67,15 @@ def list_routes():
         "method": "POST",
         "description": "List FITS file header values for a fits file",
         "fits_file": "full path of FITS file",
+      },
+      "fits-photometry": {
+        "url": "/fits/photometry/",
+        "method": "POST",
+        "description": "Run FITS image photometry",
+        "fits_file": "full path of FITS file",
+        "object": "COMA id of the object, e.g. 9P",
+        "method": "COMA photometry method, e.g. TheAperturePhotometry",
+        "aperture": "radius/aperture, scalar or vector",
       },
       "run-job": {
         "url": "/job/run/",
@@ -169,6 +178,22 @@ def task_fits_header():
   with Connection(redis.from_url(current_app.config["REDIS_URL"])):
     q = Queue()
     task = q.enqueue(coma_describe_fits, fits_file)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  return jsonify(response_object), 202
+
+@main_blueprint.route("/fits/photometry/", methods=["POST"])
+#@cross_origin(**api_cors_config)
+def task_fits_photometry():
+  fits_file = request.form["fits_file"]
+  objid = request.form["object"]
+  method = request.form["method"]
+  aperture = request.form["aperture"]
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_fits_photometry, fits_file, objid, method, aperture)
   response_object = {
     "status": "success",
     "task": { "id": task.get_id() },

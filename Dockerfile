@@ -1,6 +1,9 @@
 # base image
 FROM python:3.9.1-alpine
 
+RUN apk add build-base
+RUN apk add mariadb-dev mariadb-common mariadb-client mariadb-connector-c
+
 RUN /usr/local/bin/python -m pip install --upgrade pip
 
 # set working directory

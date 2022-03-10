@@ -103,13 +103,18 @@ def coma_object_images(obj_id):
 
 TheCOMAAPI = COMAAPI()
 
-def coma_describe_fits(fits):
+def coma_fits_header(fits):
   job = get_current_job()
   TheCOMAAPI.SetUUID(job.id)
-  return TheCOMAAPI.DescribeFits(fits)
+  return TheCOMAAPI.FITSDescribe(fits)
 
 def coma_fits_photometry(fits, objid, method, aperture):
   job = get_current_job()
   TheCOMAAPI.SetUUID(job.id)
-  return TheCOMAAPI.FitsPhotometry(fits, objid, method, aperture)
+  return TheCOMAAPI.CalibrateFITSPhotometry(fits, objid, method, aperture)
+
+def coma_fits_calibrate(fits, objid, method, aperture):
+  job = get_current_job()
+  TheCOMAAPI.SetUUID(job.id)
+  return TheCOMAAPI.CalibrateFITS(fits)
 

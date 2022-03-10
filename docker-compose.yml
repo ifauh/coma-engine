@@ -16,6 +16,7 @@ services:
     environment:
       - FLASK_DEBUG=1
       - APP_SETTINGS=project.server.config.DevelopmentConfig
+
     depends_on:
       - redis
 
@@ -25,10 +26,20 @@ services:
     volumes:
       - .:/usr/src/app
       - /COMA/bundles:/bundles
+      - /var/www/html/coma:/www
+      - /COMA/images:/COMA/images
     environment:
       - APP_SETTINGS=project.server.config.DevelopmentConfig
+      - COMA_DB_HOST=${COMA_DB_HOST}
+      - COMA_DB_PORT=${COMA_DB_PORT}
+      - COMA_DB_USER=${COMA_DB_USER}
+      - COMA_DB_PASS=${COMA_DB_PASS}
     depends_on:
       - redis
+    networks:
+#      - backend
+       default:
+         ipv4_address: 192.168.32.5
 
   redis:
     image: redis:6-alpine
@@ -47,3 +58,13 @@ services:
       - RQ_DASHBOARD_QUEUES=["default"]
     depends_on:
       - redis
+
+#networks:
+#  backend:
+#    driver: bridge
+networks:
+  default:
+    ipam:
+      #driver: default
+      config:
+        - subnet: 192.168.32.0/16

@@ -6,3 +6,4 @@ Flask-CORS==3.0.9
 redis==3.5.3
 rq==1.7.0
 requests==2.26.0
+mariadb

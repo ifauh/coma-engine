@@ -7,7 +7,7 @@ from flask_cors import CORS
 
 import json
 
-from project.server.main.tasks import coma_object_images, coma_describe_fits, coma_fits_photometry
+from project.server.main.tasks import coma_object_images, coma_fits_header, coma_fits_calibrate, coma_fits_photometry
 
 def job_tasks(job):
   job_def = json.loads(job)
@@ -27,49 +27,58 @@ main_blueprint = Blueprint("main", __name__,)
 CORS(main_blueprint)
 
 # Configure for Cross-Origin Resource Sharing (CORS)
-cors_config = {
-  "origins": ["*"],
-  "methods": ["OPTIONS", "GET", "POST"],
-  "allow_headers": ["Authorization", "Content-Type"]
+#  "allow_headers": ["Authorization", "Content-Type"]
+cors_get_config = {
+  "origins": ["http://localhost:8080", "http://localhost:5004"],
+  "methods": ["OPTIONS", "GET"],
+  "allow_headers": ["Content-Type"]
 }
-#CORS(app, resources={"/": cors_config})
-
-
+cors_post_config = {
+  "origins": ["http://localhost:8080", "http://localhost:5004", "http://localhost:*", "*"],
+  "methods": ["OPTIONS", "POST"],
+  "allow_headers": ["Content-Type"]
+}
+CORS(main_blueprint, resources={"/": cors_get_config})
 @main_blueprint.route("/", methods=["GET"])
-#@cross_origin(**api_cors_config)
 def home():
   return render_template("main/home.html")
 
 
 # API for list all URLs
+CORS(main_blueprint, resources={"/routes/": cors_get_config})
 @main_blueprint.route("/routes/", methods=["GET"])
-#@cross_origin(**api_cors_config)
 def list_routes():
   response_object = {
       "routes": {
-        "url": "/routes/", 
+        "url": "/routes", 
         "method": "GET",
         "description": "List of REST API URLs",
       },
       "objects": {
-        "url": "/objects/", 
+        "url": "/objects", 
         "method": "GET",
         "description": "List of valid object IDs",
       },
       "object-images": {
-        "url": "/object/images/<id>/", 
+        "url": "/object/images/<id>", 
         "method": "GET",
         "description": "List object images",
         "<id>": "Object ID",
       },
       "fits-header": {
-        "url": "/fits/header/",
+        "url": "/fits/header",
         "method": "POST",
         "description": "List FITS file header values for a fits file",
         "fits_file": "full path of FITS file",
       },
+      "fits-calibrate": {
+        "url": "/fits/calibrate",
+        "method": "POST",
+        "description": "Calibrate FITS image",
+        "fits_file": "full path of FITS file",
+      },
       "fits-photometry": {
-        "url": "/fits/photometry/",
+        "url": "/fits/photometry",
         "method": "POST",
         "description": "Run FITS image photometry",
         "fits_file": "full path of FITS file",
@@ -78,29 +87,29 @@ def list_routes():
         "aperture": "radius/aperture, scalar or vector",
       },
       "run-job": {
-        "url": "/job/run/",
+        "url": "/job/run",
         "method": "POST",
         "description": "Launch a job comprising a set of tasks defined in a JSON string",
         "job": "JSON encoded string describing the tasks comprising the job",
       },
       "task-status": {
-        "url": "/task/status/<task_id/",
+        "url": "/task/status/<task_id>",
         "method": "GET",
         "description": "Poll task status e.g. finished, failed",
         "<task_id>": "Task UUID",
       },
       "task-result": {
-        "url": "/task/result/<task_id/",
+        "url": "/task/result/<task_id>",
         "method": "GET",
-        "description": "Retrieve task output as a JSON enocded string",
+        "description": "Retrieve task output as a JSON encoded string",
         "<task_id>": "Task UUID",
       },
   }
   return jsonify(response_object)
 
 # API for list object ids
-@main_blueprint.route("/objects/", methods=["GET"])
-#@cross_origin(**api_cors_config)
+CORS(main_blueprint, resources={"/objects": cors_get_config})
+@main_blueprint.route("/objects", methods=["GET"])
 def list_objects():
   response_object = {
     "9p": "9P/1867 G1 (Tempel 1)",
@@ -121,8 +130,8 @@ def list_objects():
 #  return jsonify(response_object), 202
 
 
-@main_blueprint.route("/task/status/<task_id>/", methods=["GET"])
-#@cross_origin(**api_cors_config)
+CORS(main_blueprint, resources={"/task/status*": cors_get_config})
+@main_blueprint.route("/task/status/<task_id>", methods=["GET"])
 def get_status(task_id):
   with Connection(redis.from_url(current_app.config["REDIS_URL"])):
     q = Queue()
@@ -139,8 +148,8 @@ def get_status(task_id):
     response_object = { "status": "error" }
   return jsonify(response_object)
 
-@main_blueprint.route("/task/result/<task_id>/", methods=["GET"])
-#@cross_origin(**api_cors_config)
+CORS(main_blueprint, resources={"/task/result*": cors_get_config})
+@main_blueprint.route("/task/result/<task_id>", methods=["GET"])
 def get_result(task_id):
   with Connection(redis.from_url(current_app.config["REDIS_URL"])):
     q = Queue()
@@ -159,8 +168,8 @@ def get_result(task_id):
     response_object = { "status": "error" }
   return jsonify(response_object)
 
+CORS(main_blueprint, resources={"/object/images*": cors_get_config})
 @main_blueprint.route("/object/images/<obj_id>", methods=["GET"])
-#@cross_origin(**api_cors_config)
 def task_object_images(obj_id):
   with Connection(redis.from_url(current_app.config["REDIS_URL"])):
     q = Queue()
@@ -171,21 +180,23 @@ def task_object_images(obj_id):
   }
   return jsonify(response_object), 202
 
-@main_blueprint.route("/fits/header/", methods=["POST"])
-#@cross_origin(**api_cors_config)
+CORS(main_blueprint, resources={"/fits/header*": cors_post_config})
+@main_blueprint.route("/fits/header", methods=["POST"])
 def task_fits_header():
   fits_file = request.form["fits_file"]
   with Connection(redis.from_url(current_app.config["REDIS_URL"])):
     q = Queue()
-    task = q.enqueue(coma_describe_fits, fits_file)
+    task = q.enqueue(coma_fits_header, fits_file)
   response_object = {
     "status": "success",
     "task": { "id": task.get_id() },
   }
-  return jsonify(response_object), 202
+  response = jsonify(response_object)
+  response.headers.add("Access-Control-Allow-Origin", "*")
+  return response, 202
 
-@main_blueprint.route("/fits/photometry/", methods=["POST"])
-#@cross_origin(**api_cors_config)
+CORS(main_blueprint, resources={"/fits/photometry*": cors_post_config})
+@main_blueprint.route("/fits/photometry", methods=["POST"])
 def task_fits_photometry():
   fits_file = request.form["fits_file"]
   objid = request.form["object"]
@@ -198,16 +209,34 @@ def task_fits_photometry():
     "status": "success",
     "task": { "id": task.get_id() },
   }
-  return jsonify(response_object), 202
+  response = jsonify(response_object)
+  response.headers.add("Access-Control-Allow-Origin", "*")
+  return response, 202
 
-@main_blueprint.route("/job/run/", methods=["POST"])
-#@cross_origin(**api_cors_config)
+CORS(main_blueprint, resources={"/fits/calibrate*": cors_post_config})
+@main_blueprint.route("/fits/calibrate", methods=["POST"])
+def task_fits_calibrate():
+  fits_file = request.form["fits_file"]
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_fits_calibrate, fits_file)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  response = jsonify(response_object)
+  response.headers.add("Access-Control-Allow-Origin", "*")
+  return response, 202
+
+CORS(main_blueprint, resources={"/job/run*": cors_post_config})
+@main_blueprint.route("/job/run", methods=["POST"])
 def task_run_job():
   job = request.form["job"]
   response_object = job_tasks(job)
-  return jsonify(response_object), 202
+  response = jsonify(response_object)
+  response.headers.add("Access-Control-Allow-Origin", "*")
+  return response, 202
 
-#@main_blueprint.route("/tasks", methods=["POST"])
 #def run_task():
 #  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
 #    q = Queue()

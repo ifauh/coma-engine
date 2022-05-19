@@ -103,6 +103,7 @@ TheBundle = Bundle()
 #
 #  response = json.dumps(image_files)
 #  return response
+# Need to call TheCOMADB.Run(query) then get results when they are available
 
 TheCOMADB = COMADB()
 
@@ -145,6 +146,11 @@ TheCOMAAPI = COMAAPI()
 def coma_fits_header(fits):
   job = get_current_job()
   TheCOMAAPI.SetUUID(job.id)
+  return TheCOMAAPI.HeaderFITS(fits)
+
+def coma_fits_describe(fits):
+  job = get_current_job()
+  TheCOMAAPI.SetUUID(job.id)
   return TheCOMAAPI.DescribeFITS(fits)
 
 def coma_fits_photometry(fits, objid, method, aperture):
@@ -156,4 +162,8 @@ def coma_fits_calibrate(fits):
   job = get_current_job()
   TheCOMAAPI.SetUUID(job.id)
   return TheCOMAAPI.CalibrateFITS(fits)
+
+def coma_insert_telescope(telescopeName):
+  job = get_current_job()
+  return TheCOMADB.InsertTelescope(telescopeName)
 

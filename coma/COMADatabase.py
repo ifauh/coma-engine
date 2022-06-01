@@ -39,12 +39,12 @@ class COMADB:
   def CloseDB(self):
     self.conn = None
 
-  def Run(self, dmlSQL, dmlData):
+  def Run(self, dmlSQL, dmlData = None):
     # create a connection cursor
     self.cursor = self.conn.cursor()
     # execute a SQL statement
     # TODO check for sql injection
-    logging.debug(queryStr)
+    logging.debug(dmlSQL)
     return self.cursor.execute(dmlSQL, dmlData)
  
   def GetResultHeaders(self):
@@ -60,7 +60,10 @@ class COMADB:
     for results in rv:
       row = []
       for r in results:
-        row.append(r.replace('\r',""))
+        if isinstance(r, str):
+          row.append(r.replace('\r',""))
+        else:
+          row.append(r)
       self.column_values.append(row)
       #self.column_values.append(dict(zip(self.column_headers,result)))
     return self.column_values

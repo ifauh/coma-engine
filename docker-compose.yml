@@ -12,6 +12,7 @@ services:
     volumes:
       - .:/usr/src/app
       - /COMA/bundles:/bundles
+      - /COMA/collections:/collections
       - /COMA/Coma:/coma
     environment:
       - FLASK_DEBUG=1
@@ -26,6 +27,7 @@ services:
     volumes:
       - .:/usr/src/app
       - /COMA/bundles:/bundles
+      - /COMA/collections:/collections
       - /var/www/html/coma:/www
       - /COMA/images:/COMA/images
     environment:

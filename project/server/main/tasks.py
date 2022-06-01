@@ -9,6 +9,7 @@ from COMAJSONServer import COMAAPI
 from COMADatabase import COMADB
 
 BUNDLE_PATH='/bundles'
+COLLECTION_PATH='/collections'
 logging.basicConfig(filename='/usr/src/app/logs/coma.log', filemode='w', encoding='utf-8', level=logging.DEBUG)
 
 def has_digits(inStr):
@@ -90,6 +91,59 @@ class Bundle:
 
 TheBundle = Bundle()
 
+class Collection:
+  # default constructor
+  def __init__(self):
+    self.debug=False
+    self.Load()
+    self.Dump()
+ 
+  # a method for loading collection names and ids
+  def Load(self):
+    self.collection={}
+
+    instLIDFile = COLLECTION_PATH + '/etc' + '/collection-lid.tsv'
+    with open(instLIDFile) as fd:
+      firstRow=1
+      rd = csv.reader(fd, delimiter="\t", quotechar='"')
+      for row in rd:
+        if(firstRow):
+          firstRow = 0
+          continue
+
+        lid=row[0].strip()
+        if(self.debug):
+          print("LID: %s" % lid)
+  
+        inst=row[1]
+        if(self.debug):
+          print("INSTRUMENT: %s" % inst)
+        self.collection[inst] = lid
+        self.instrument[inst] = row[3]
+        self.telescope[inst] = row[2]
+        self.tinst[inst] = row[4]
+
+  def Dump(self):
+    with open("/collections/etc/collection-lids.csv", "w") as outfile:
+      for key in self.collection:
+        collection_lid = "%s,%s,%s,%s\n" % (key, self.collection[key], self.telescope[key], self.instrument[key])
+        outfile.write(collection_lid)
+
+  def IDFromName(self, name):
+    #try with object
+    #if object has no digits in it then append 1 and try again
+    #if no match then raise exception for now return "UNKNOWN"
+    matched="UNKNOWN"
+    if name in self.collection:
+      matched=self.collection[name]
+    elif name.lower() in self.collection:
+      matched=self.collection[name.lower()]
+    elif name.upper() in self.collection:
+      matched=self.collection[name.upper()]
+    return matched
+
+TheCollection = Collection()
+
 #def coma_object_images(obj_id):
 #  job = get_current_job()
 #  obj_id = TheBundle.IDFromName(obj_id)
@@ -166,4 +220,25 @@ def coma_fits_calibrate(fits):
 def coma_insert_telescope(telescopeName):
   job = get_current_job()
   return TheCOMADB.InsertTelescope(telescopeName)
+
+def coma_observatory_info(obs_id):
+  job = get_current_job()
+
+  #add this back later when object ids are normalized
+  #obj_id = TheBundle.IDFromName(obj_id)
+  obs_id = obs_id.replace("<","").replace(">","")
+
+  query = "select * from coma.obscode where code = '%s';" % (obs_id)
+  TheCOMADB.Run(query)
+
+  ret = {}
+  # serialize results into JSON
+  row_headers=TheCOMADB.GetResultHeaders()
+  row_values = TheCOMADB.GetResults()
+  for row in row_values:
+    ret = row
+    break;
+
+  response = json.dumps(ret)
+  return response
 

@@ -11,8 +11,8 @@ services:
     command: python manage.py run -h 0.0.0.0
     volumes:
       - .:/usr/src/app
-      - /COMA/bundles:/bundles
-      - /COMA/collections:/collections
+      - /COMA/bundle:/bundle
+      - /COMA/collection:/collection
       - /COMA/Coma:/coma
     environment:
       - FLASK_DEBUG=1
@@ -26,8 +26,8 @@ services:
     command: python manage.py run_worker
     volumes:
       - .:/usr/src/app
-      - /COMA/bundles:/bundles
-      - /COMA/collections:/collections
+      - /COMA/bundle:/bundle
+      - /COMA/collection:/collection
       - /var/www/html/coma:/www
       - /COMA/images:/COMA/images
     environment:

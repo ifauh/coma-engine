@@ -80,15 +80,124 @@ class COMADB:
       ret = ""
     return ret
 
+  # a subroutine to get the last valid ID and increment by one
+  def GetNextID(self, tableName, idName):
+    idQuery = "SELECT max(%s) as 'nextid' from %s;" % (idName, tableName)
+    self.Run(idQuery)
+    self.GetResultHeaders()
+    row = self.GetResults()
+    return int(row['nextid']) + 1
+
   def InsertTelescope(self, telescopeName):
     # create a connection cursor
-    values = (1, telescopeName)
-    insert = "INSERT INTO telescopes (telescopeid, telescopename) VALUES (?, ?)"
+    tableStr = 'telescopes'
+    idStr = 'telescopeid'
+    nextID = self.GetNextID(tableStr, idStr)
+    values = (nextID, telescopeName)
+    insert = "INSERT INTO %s (%s, telescopename) VALUES (?, ?)" % (tableStr, idStr)
     return self.InsertRow(insert, values)
 
-  def InsertInstrument(self, instrumentName):
+  def InsertInstrument(self, collection_lid):
     # create a connection cursor
-    values = (int(1), instrumentName)
-    insert = "INSERT INTO tinstruments (tinstuumentid, tinstrumentname) VALUES (?, ?)"
+    tableStr = 'tinstruments'
+    idStr = 'tinstrumentid'
+    nextID = self.GetNextID(tableStr, idStr)
+    values = (nextID, collection_lid)
+    insert = "INSERT INTO %s (%s, tinstrumentname) VALUES (?, ?)" % (tableStr, idStr)
     return self.InsertRow(insert, values)
+
+  def InsertObject(self, bundle_lid, objectType):
+    # create a connection cursor
+    tableStr = 'objects'
+    idStr = 'objectid'
+    nextID = self.GetNextID(tableStr, idStr)
+    values = (nextID, bundle_lid, objectType)
+    insert = "INSERT INTO %s (%s, defaultobjectname, objecttype_coma) VALUES (?, ?, ?)" % (tableStr, idStr)
+    return self.InsertRow(insert, values)
+
+  def InsertImage(self, imageType, object_lid, mjd, expTime, filterName, filePath, fileName):
+    # create a connection cursor
+    tableStr = 'images'
+    idStr = 'imageid'
+    nextID = self.GetNextID(tableStr, idStr)
+    values = (nextID,  imageType, object_lid, mjd, expTime, filterName, filePath, fileName)
+    insert = "INSERT INTO %s (%s, imagetype, jd, exptime, filter, filepath, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" % (tableStr, idStr)
+    return self.InsertRow(insert, values)
+
+# imageid       | int(11)       | NO   | PRI | NULL    |       |
+# imagedate     | date          | YES  |     | NULL    |       |
+# object        | char(10)      | YES  |     | NULL    |       |
+# imagetype     | char(40)      | YES  |     | NULL    |       |
+# jd            | decimal(15,7) | YES  |     | NULL    |       |
+# exptime       | float         | YES  |     | NULL    |       |
+# filter        | varchar(2)    | YES  |     | NULL    |       |
+# filepath      | varchar(60)   | YES  |     | NULL    |       |
+# filename      | varchar(40)   | YES  |     | NULL    |       |
+
+  # a subroutine to get the image id from a FITS filename
+  def GetImageID(self, fits_file):
+    tableStr = 'images'
+    idStr = 'imageid'
+    #split fits_file into path and file name parts
+    queryStr = "SELECT %s from %s WHERE filepath = '%s' AND filename = '%s';" % (idStr, tableStr, fitsPath, fitsFile)
+    self.Run(queryStr)
+    self.GetResultHeaders()
+    row = self.GetResults()
+    return int(row[idStr])
+
+  #a subroutine to get the instrument id from an instrument_lid (already mapped from Jan's code
+  def GetInstrumentID(self, collection_lid):
+    tableStr = 'tinstruments'
+    idStr = 'tinstrumentid'
+    #assume telinstruments are inserted using coma-collection-lid as tinstrumentname
+    queryStr = "SELECT %s from %s WHERE tinstrumentname = '%s';" % (idStr, tableStr, collection_lid)
+    self.Run(queryStr)
+    self.GetResultHeaders()
+    row = self.GetResults()
+    return int(row[idStr])
+
+  def InsertCalibration(self, fits_file, instrument_lid, mjdMiddle, filterCode, nStars, zpMag, zpMagErr):
+    # create a connection cursor
+    tableStr = 'calibrations'
+    idStr = 'calibrationid'
+    nextID = self.GetNextID(tableStr, idStr)
+
+    # need lookup code for imageID from FITS_FILE name and instumentID from Jan's Instrument code
+    imageID = GetImageID(fits_file)
+    instrumentID = GetInstrumentID(instrument_lid)
+
+    values = (nextID,  imageID, instrumentID, mjdMiddle, filterCode, nStars, zpMag, zpMagErr)
+    insert = "INSERT INTO %s (%s, imageid, instrumentid, mjd_middle, filter, nstars, zpmag, zpmag_error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" % (tableStr, idStr)
+    return self.InsertRow(insert, values)
+
+# imageid                   | int(11)     | NO   | PRI | NULL    |       |
+# calibrationid             | int(11)     | NO   |     | NULL    |       |
+# instrumentid              | int(11)     | NO   |     | NULL    |       |
+# mjd_middle                | double      | YES  |     | NULL    |       |
+# filter                    | char(2)     | YES  |     | NULL    |       |
+# nstars                    | int(11)     | YES  |     | NULL    |       |
+# zpmag                     | double      | YES  |     | NULL    |       |
+# zpmag_error               | double      | YES  |     | NULL    |       |
+# extinction                | double      | YES  |     | NULL    |       |
+# extinction_error          | double      | YES  |     | NULL    |       |
+# colorterm                 | double      | YES  |     | NULL    |       |
+# colorterm_error           | double      | YES  |     | NULL    |       |
+# zpinstmag                 | double      | YES  |     | NULL    |       |
+# zpinstmag_err             | double      | YES  |     | NULL    |       |
+# pixel_scale               | double      | YES  |     | NULL    |       |
+# psf_nobj                  | int(11)     | YES  |     | NULL    |       |
+# psf_fwhm_arcsec           | double      | YES  |     | NULL    |       |
+# psf_major_axis_arcsec     | double      | YES  |     | NULL    |       |
+# psf_minor_axis_arcsec     | double      | YES  |     | NULL    |       |
+# psf_pa_pix                | double      | YES  |     | NULL    |       |
+# psf_pa_world              | double      | YES  |     | NULL    |       |
+# limit_mag_5_sigma         | double      | YES  |     | NULL    |       |
+# limit_mag_10_sigma        | double      | YES  |     | NULL    |       |
+# ndensity_mag_20           | double      | YES  |     | NULL    |       |
+# ndensity_5_sigma          | double      | YES  |     | NULL    |       |
+# sky_backd_adu_pix         | double      | YES  |     | NULL    |       |
+# sky_backd_photons_pix     | double      | YES  |     | NULL    |       |
+# sky_backd_adu_arcsec2     | double      | YES  |     | NULL    |       |
+# sky_backd_photons_arcsec2 | double      | YES  |     | NULL    |       |
+# sky_backd_mag_arcsec2     | double      | YES  |     | NULL    |       |
 

@@ -8,7 +8,7 @@ from flask_cors import CORS
 import json
 
 from project.server.main.tasks import coma_object_images, coma_fits_header, coma_fits_describe, coma_fits_calibrate, coma_fits_photometry
-from project.server.main.tasks import coma_insert_telescope, coma_observatory_info
+from project.server.main.tasks import coma_insert_telescope, coma_get_observatory, coma_get_telescope
 
 def job_tasks(job):
   job_def = json.loads(job)
@@ -65,6 +65,12 @@ def list_routes():
         "method": "GET",
         "description": "List object images",
         "<id>": "Object ID",
+      },
+      "telescope": {
+        "url": "/telescope/<code>", 
+        "method": "GET",
+        "description": "Get telescope attributes",
+        "<code>": "Telescope Code",
       },
       "observatory": {
         "url": "/observatory/<code>", 
@@ -297,7 +303,19 @@ CORS(main_blueprint, resources={"/observatory*": cors_get_config})
 def task_observatory_info(obs_id):
   with Connection(redis.from_url(current_app.config["REDIS_URL"])):
     q = Queue()
-    task = q.enqueue(coma_observatory_info, obs_id)
+    task = q.enqueue(coma_get_observatory, obs_id)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  return jsonify(response_object), 202
+
+CORS(main_blueprint, resources={"/telescope*": cors_get_config})
+@main_blueprint.route("/telescope/<tel_id>", methods=["GET"])
+def task_get_telescope(tel_id):
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_get_telescope, tel_id)
   response_object = {
     "status": "success",
     "task": { "id": task.get_id() },

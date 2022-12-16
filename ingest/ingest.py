@@ -5,6 +5,9 @@ import csv
 import time
 from itertools import chain
 from os.path import exists
+from os.path import basename
+from os.path import dirname
+from astropy.time import Time
 import argparse
 
 try:
@@ -22,6 +25,7 @@ requests_log = logging.getLogger("requests.packages.urllib3")
 parser = argparse.ArgumentParser()
 parser.add_argument("fits", help="FITS file to ingest")
 parser.add_argument("object", help="central object in FITS file")
+parser.add_argument("-i", "--id", type=int, default=1, help="image ID")
 parser.add_argument("-m", "--method", default='TheAperturePhotometry', help="aperture photometry method to use")
 parser.add_argument("-a", "--aperture", default='[5,10]', help="aperture list, e.g. [5,10]")
 parser.add_argument("-v", "--verbosity", action="count", default=0)
@@ -85,6 +89,56 @@ ARGS={
   'fits_file': FITS
 }
 
+
+################
+def LookupTelescope(telescope):
+  if telescope.startswith('uh88'):
+    return 1
+  if telescope.startswith('cfht'):
+    return 2
+  return 0
+
+def LookupInstrument(instrument):
+  if instrument.startswith('uh88-tektronix-2048-ccd'):
+    return 1
+  elif instrument.startswith('cfht-megacam-one-chip'):
+    return 2
+  return 0
+
+def MJDtoDate(mjd):
+  t = Time(mjd, format='mjd', scale='utc')
+  timestr = t.strftime('%Y-%m-%d')
+  return timestr
+
+def LookupObject(object):
+  if object == 'C/2017 K2':
+    return 1049
+  return 0
+
+def FilePath(fullpath):
+  path_name = dirname(fullpath)
+  return path_name
+
+def FileName(fullpath):
+  file_name = basename(fullpath)
+  return file_name
+
+def ImageRow(id, desc):
+  row = [id]
+  row.append(desc['OBSCODE'])
+  row.append(LookupTelescope(desc['INSTRUMENT']))
+  row.append(LookupInstrument(desc['INSTRUMENT']))
+  row.append('COMA')
+  row.append(MJDtoDate(desc['MJD-MID']))
+  row.append(LookupObject(desc['OBJECT']))
+  row.append(desc['OBSTYPE'])
+  row.append(desc['MJD-MID'])
+  row.append(desc['EXPTIME'])
+  row.append(desc['FILTER'])
+  row.append(FilePath(desc['FITS-FILE']))
+  row.append(FileName(desc['FITS-FILE']))
+  return row
+
 ################
 # First describe FITS file
 API='https://coma.ifa.hawaii.edu/api/fits/describe'
@@ -115,11 +169,57 @@ del description['TYPE']
 # Counter variable used for writing
 # headers to the CSV file
 if img_header:
-  header = description.keys()
+  header = [
+    'imageid',
+    'obscode',
+    'telescopeid',
+    'instrumentid',
+    'imagestr',
+    'imagedate',
+    'objectid',
+    'imagetype',
+    'mjd_mid',
+    'exptime',
+    'filter',
+    'filepath',
+    'filename'
+  ]
   img_writer.writerow(header)
   img_header = False
 
-img_writer.writerow(description.values())
+img_writer.writerow(ImageRow(args.id, description))
+
+def CalibrationRow(id, desc, calib):
+  row = [id]
+  # assume calibrationid == imageid for now
+  row.append(id)
+  row.append(LookupInstrument(desc['INSTRUMENT']))
+  row.append(desc['MJD-MID'])
+  row.append(calib['PHOT-CALIB-INFO']['FILTER'])
+  row.append(calib['PHOT-CALIB-INFO']['CATALOG'])
+  row.append(calib['PHOT-CALIB-INFO']['NSTARS'])
+  row.append(calib['PHOT-CALIB-INFO']['ZPMAG'])
+  row.append(calib['PHOT-CALIB-INFO']['ZPMAGERR'])
+  row.append(calib['PHOT-CALIB-INFO']['ZPINSTMAG'])
+  row.append(calib['PHOT-CALIB-INFO']['ZPINSTMAGERR'])
+  row.append(calib['QUALITIES-INFO']['PIXEL-SCALE'])
+  row.append(calib['QUALITIES-INFO']['PSF-NOBJ'])
+  row.append(calib['QUALITIES-INFO']['PSF-FWHM-ARCSEC'])
+  row.append(calib['QUALITIES-INFO']['PSF-MAJOR-AXIS-ARCSEC'])
+  row.append(calib['QUALITIES-INFO']['PSF-MINOR-AXIS-ARCSEC'])
+  row.append(calib['QUALITIES-INFO']['PSF-PA-PIX'])
+  row.append(calib['QUALITIES-INFO']['PSF-PA-WORLD'])
+  row.append(calib['QUALITIES-INFO']['MAG-5-SIGMA'])
+  row.append(calib['QUALITIES-INFO']['MAG-10-SIGMA'])
+  row.append(calib['QUALITIES-INFO']['NDENSITY-MAG-20'])
+  row.append(calib['QUALITIES-INFO']['NDENSITY-5-SIGMA'])
+  row.append(calib['QUALITIES-INFO']['SKY-BACKD-ADU-PIX'])
+  row.append(calib['QUALITIES-INFO']['SKY-BACKD-PHOTONS-PIX'])
+  row.append(calib['QUALITIES-INFO']['SKY-BACKD-ADU-ARCSEC2'])
+  row.append(calib['QUALITIES-INFO']['SKY-BACKD-PHOTONS-ARCSEC2'])
+  row.append(calib['QUALITIES-INFO']['SKY-BACKD-MAG-ARCSEC2'])
+
+  return row
 
 ################
 # Next calibrate FITS file
@@ -145,32 +245,80 @@ while cursor < 20 and 'data' not in data:
 
 calibration = json.loads(data['data'])
 print(calibration)
-qualities = calibration['QUALITIES-INFO']
-wcs = calibration['WCS-INFO']
-wcscal = wcs['WCS']
-del wcs['WCS']
-photcalib = calibration['PHOT-CALIB-INFO']
+#qualities = calibration['QUALITIES-INFO']
+#wcs = calibration['WCS-INFO']
+#wcscal = wcs['WCS']
+#del wcs['WCS']
+#photcalib = calibration['PHOT-CALIB-INFO']
 
 #del calibration['TYPE']
 
-header = []
-row = []
-for key, val in qualities.items():
-  header.append(key)
-  row.append(val)
-for key, val in wcs.items():
-  header.append(key)
-  row.append(val)
-for key, val in wcscal.items():
-  header.append(key)
-  row.append(val)
-for key, val in photcalib.items():
-  header.append(key)
-  row.append(val)
 if cal_header:
+  header = [
+    'imageid',
+    'calibrationid',
+    'instrumentid',
+    'mjd_middle',
+    'filter',
+    'catalog',
+    'nstars',
+    'zpmag',
+    'zpmag_error',
+    #'extinction',
+    #'extinction_error',
+    #'colorterm',
+    #'colorterm_error',
+    'zpinstmag',
+    'zpinstmag_err',
+    'pixel_scale',
+    'psf_nobj',
+    'psf_fwhm_arcsec',
+    'psf_major_axis_arcsec',
+    'psf_minor_axis_arcsec',
+    'psf_pa_pix',
+    'psf_pa_world',
+    'limit_mag_5_sigma',
+    'limit_mag_10_sigma',
+    'ndensity_mag_20',
+    'ndensity_5_sigma',
+    'sky_backd_adu_pix',
+    'sky_backd_photons_pix',
+    'sky_backd_adu_arcsec2',
+    'sky_backd_photons_arcsec2',
+    'sky_backd_mag_arcsec2',
+  ]
   cal_writer.writerow(header)
   cal_header = False
-cal_writer.writerow(row)
+
+cal_writer.writerow(CalibrationRow(args.id, description, calibration))
+
+def PhotometryRow(id, desc, photo):
+  row = []
+  # this should match the number of aperture sizes we supplied, in this case 2 ([5,10])
+  apertures = len(photo['PHOTOMETRY-RESULTS'][0]['APERTURES'])
+  for a in range(apertures):
+    r = [((id-182)*2)-1+a]
+    r.append(id)
+    r.append(LookupObject(desc['OBJECT']))
+    # assume calibrationid == imageid for now
+    r.append(id)
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['ID'])
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['APERTURES'][a])
+    r.append(photo['FILTER'])
+    r.append(photo['XPIX-OBJECT-INPUT'])
+    r.append(photo['YPIX-OBJECT-INPUT'])
+    r.append(photo['DEC-OBJECT-INPUT'])
+    r.append(photo['RA-OBJECT-INPUT'])
+    r.append(photo['ZPMAG'])
+    r.append(photo['ZPMAGERR'])
+    # the 0 index is for methods, in this case we only supplied 1 method
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['BACKGROUND-RADII'][a])
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['BACKGROUND-FLUX-ADU/ARCSEC2'][a])
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['BACKGROUND-FLUX-PHOTONS/ARCSEC2'][a])
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['APERTURE-MAGS'][a])
+    r.append(photo['PHOTOMETRY-RESULTS'][0]['APERTURE-MAG-ERRORS'][a])
+    row.append(r)
+  return row
 
 ################
 # Next do photometry on FITS file
@@ -200,41 +348,32 @@ while cursor < 30 and 'data' not in data:
 photometry = json.loads(data['data'])
 print(photometry)
 
-photval = photometry['PHOTOMETRY-RESULTS'][0]
-del photometry['PHOTOMETRY-RESULTS']
-del photometry['TYPE']
+if phot_header:
+  header = [
+    'photid',
+    'imageid',
+    'objectid',
+    'calibrationid',
+    'phot_type',
+    'aperture',
+    'filter',
+    'xpix-object',
+    'ypix-object',
+    'dec-object',
+    'ra-object',
+    'zpmag',
+    'zpmagerr',
+    'aperture_backd_radii',
+    'backd_flux_adu_persec',
+    'backd_flux_photon_persec',
+    'mag',
+    'mag_err',
+  ]
+  phot_writer.writerow(header)
+  phot_header = False
 
-del photval['TYPE']
-photmeta = {}
-photmeta['ID'] = photval['ID']
-del photval['ID']
-photmeta['XPIX-FINAL'] = photval['XPIX-FINAL']
-del photval['XPIX-FINAL']
-photmeta['YPIX-FINAL'] = photval['YPIX-FINAL']
-del photval['YPIX-FINAL']
-photmeta['RA-FINAL'] = photval['RA-FINAL']
-del photval['RA-FINAL']
-photmeta['DEC-FINAL'] = photval['DEC-FINAL']
-del photval['DEC-FINAL']
-photmeta['POSITION-WAS-TUNED'] = photval['POSITION-WAS-TUNED']
-del photval['POSITION-WAS-TUNED']
-
-for aperture in range(2):
-  header = []
-  row = []
-  for key, val in photometry.items():
-    header.append(key)
-    row.append(val)
-  for key, val in photmeta.items():
-    header.append(key)
-    row.append(val)
-  for key, val in photval.items():
-    header.append(key)
-    row.append(val[aperture])
-  # headers to the CSV file
-  if phot_header:
-    phot_writer.writerow(header)
-    phot_header = False
+rows = PhotometryRow(args.id, description, photometry)
+for row in rows:
   phot_writer.writerow(row)
 
 ###############################################

@@ -5,90 +5,15 @@ import logging
 from rq import get_current_job
 import json
 import csv
+import re
 from COMAJSONServer import COMAAPI
 from COMADatabase import COMADB
+from COMAPDS4 import Bundle, Collection
 
-BUNDLE_PATH='/bundles'
 logging.basicConfig(filename='/usr/src/app/logs/coma.log', filemode='w', encoding='utf-8', level=logging.DEBUG)
 
-def has_digits(inStr):
-  return any(char.isdigit() for char in inStr)
-
-def list_to_string(inList):
-  return ''.join([str(item) for item in inList])
-
-class Bundle:
-  # default constructor
-  def __init__(self):
-    self.debug=False
-    self.Load()
-    self.Dump()
- 
-  # a method for loading bundle names and ids
-  def Load(self):
-    self.bundle={}
-
-    cometLIDFile = BUNDLE_PATH + '/etc' + '/bundle-lid-comet.tsv'
-    with open(cometLIDFile) as fd:
-      firstRow=1
-      rd = csv.reader(fd, delimiter="\t", quotechar='"')
-      for row in rd:
-        if(firstRow):
-          firstRow = 0
-          continue
-
-        lid=row[0].strip()
-        if(self.debug):
-          print("LID: %s" % lid)
-  
-        title=row[1]
-        if(self.debug):
-          print("TITLE: %s" % title)
-  
-        # parse and load the main ids
-        titles=title.split('(')
-        for title in titles:
-          #title=list_to_string(titles[ind])
-          title=title.split(')')
-          title=list_to_string(title[0])
-          title=title.strip()
-          if(self.debug):
-            print("TITLE: %s" % title)
-
-          self.bundle[title] = lid
-
-        # parse and load alternate ids
-        aliases = row[2].split(',')
-        if(self.debug):
-          print("  %s" % aliases)
-        if aliases[0] != "":
-          for alias in aliases:
-            if(self.debug):
-              print("  %s" % alias)
-
-            alias = alias.strip()
-            self.bundle[alias] = lid
-
-  def Dump(self):
-    with open("/bundles/etc/bundle-lids.csv", "w") as outfile:
-      for key in self.bundle:
-        bundle_lid = "%s,%s\n" % (key, self.bundle[key])
-        outfile.write(bundle_lid)
-
-  def IDFromName(self, name):
-    #try with object
-    #if object has no digits in it then append 1 and try again
-    #if no match then raise exception for now return "UNKNOWN"
-    matched="UNKNOWN"
-    if name in self.bundle:
-      matched=self.bundle[name]
-    elif name.lower() in self.bundle:
-      matched=self.bundle[name.lower()]
-    elif name.upper() in self.bundle:
-      matched=self.bundle[name.upper()]
-    return matched
-
 TheBundle = Bundle()
+TheCollection = Collection()
 
 #def coma_object_images(obj_id):
 #  job = get_current_job()
@@ -103,6 +28,7 @@ TheBundle = Bundle()
 #
 #  response = json.dumps(image_files)
 #  return response
+# Need to call TheCOMADB.Run(query) then get results when they are available
 
 TheCOMADB = COMADB()
 
@@ -145,6 +71,11 @@ TheCOMAAPI = COMAAPI()
 def coma_fits_header(fits):
   job = get_current_job()
   TheCOMAAPI.SetUUID(job.id)
+  return TheCOMAAPI.HeaderFITS(fits)
+
+def coma_fits_describe(fits):
+  job = get_current_job()
+  TheCOMAAPI.SetUUID(job.id)
   return TheCOMAAPI.DescribeFITS(fits)
 
 def coma_fits_photometry(fits, objid, method, aperture):
@@ -157,3 +88,38 @@ def coma_fits_calibrate(fits):
   TheCOMAAPI.SetUUID(job.id)
   return TheCOMAAPI.CalibrateFITS(fits)
 
+def coma_insert_telescope(telescopeName):
+  job = get_current_job()
+  return TheCOMADB.InsertTelescope(telescopeName)
+
+def query_results(query):
+  TheCOMADB.Run(query)
+
+  ret = {}
+  # serialize results into JSON
+  row_headers=TheCOMADB.GetResultHeaders()
+  row_values = TheCOMADB.GetResults()
+  for row in row_values:
+    ret = row
+    break;
+
+  response = json.dumps(ret)
+  return response
+
+def coma_get_telescope(tel_id):
+  job = get_current_job()
+  #obj_id = TheBundle.IDFromName(tel_id)
+  key = tel_id.replace("<","").replace(">","")
+
+  query = "select * from coma.telescopes where telescopeid = '%s';" % (key)
+  return query_results(query)
+
+def coma_get_observatory(obs_id):
+  job = get_current_job()
+
+  #add this back later when object ids are normalized
+  #obj_id = TheBundle.IDFromName(obj_id)
+  obs_id = obs_id.replace("<","").replace(">","")
+
+  query = "select * from coma.obscode where code = '%s';" % (obs_id)
+  return query_results(query)

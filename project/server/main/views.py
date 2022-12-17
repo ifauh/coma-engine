@@ -7,7 +7,8 @@ from flask_cors import CORS
 
 import json
 
-from project.server.main.tasks import coma_object_images, coma_fits_header, coma_fits_calibrate, coma_fits_photometry
+from project.server.main.tasks import coma_object_images, coma_fits_header, coma_fits_describe, coma_fits_calibrate, coma_fits_photometry
+from project.server.main.tasks import coma_insert_telescope, coma_get_observatory, coma_get_telescope
 
 def job_tasks(job):
   job_def = json.loads(job)
@@ -65,10 +66,28 @@ def list_routes():
         "description": "List object images",
         "<id>": "Object ID",
       },
+      "telescope": {
+        "url": "/telescope/<code>", 
+        "method": "GET",
+        "description": "Get telescope attributes",
+        "<code>": "Telescope Code",
+      },
+      "observatory": {
+        "url": "/observatory/<code>", 
+        "method": "GET",
+        "description": "Get observatory attributes",
+        "<code>": "Observatory Code",
+      },
       "fits-header": {
         "url": "/fits/header",
         "method": "POST",
         "description": "List FITS file header values for a fits file",
+        "fits_file": "full path of FITS file",
+      },
+      "fits-describe": {
+        "url": "/fits/describe",
+        "method": "POST",
+        "description": "Get FITS observation data for a fits file",
         "fits_file": "full path of FITS file",
       },
       "fits-calibrate": {
@@ -195,6 +214,21 @@ def task_fits_header():
   response.headers.add("Access-Control-Allow-Origin", "*")
   return response, 202
 
+CORS(main_blueprint, resources={"/fits/describe*": cors_post_config})
+@main_blueprint.route("/fits/describe", methods=["POST"])
+def task_fits_describe():
+  fits_file = request.form["fits_file"]
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_fits_describe, fits_file)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  response = jsonify(response_object)
+  response.headers.add("Access-Control-Allow-Origin", "*")
+  return response, 202
+
 CORS(main_blueprint, resources={"/fits/photometry*": cors_post_config})
 @main_blueprint.route("/fits/photometry", methods=["POST"])
 def task_fits_photometry():
@@ -247,4 +281,44 @@ def task_run_job():
 #  }
 #  return jsonify(response_object), 202
 
+
+CORS(main_blueprint, resources={"/insert/telescope*": cors_post_config})
+@main_blueprint.route("/insert/telescope", methods=["POST"])
+def task_insert_telescope():
+  telescopeName = request.form["name"]
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_insert_telescope, telescopeName)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  response = jsonify(response_object)
+  response.headers.add("Access-Control-Allow-Origin", "*")
+  return response, 202
+
+
+CORS(main_blueprint, resources={"/observatory*": cors_get_config})
+@main_blueprint.route("/observatory/<obs_id>", methods=["GET"])
+def task_observatory_info(obs_id):
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_get_observatory, obs_id)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  return jsonify(response_object), 202
+
+CORS(main_blueprint, resources={"/telescope*": cors_get_config})
+@main_blueprint.route("/telescope/<tel_id>", methods=["GET"])
+def task_get_telescope(tel_id):
+  with Connection(redis.from_url(current_app.config["REDIS_URL"])):
+    q = Queue()
+    task = q.enqueue(coma_get_telescope, tel_id)
+  response_object = {
+    "status": "success",
+    "task": { "id": task.get_id() },
+  }
+  return jsonify(response_object), 202
 

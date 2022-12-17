@@ -79,7 +79,10 @@ class COMAAPI:
         else:
           logging.debug(json.dumps(rsp))
           if rsp["TYPE"] == "RESPONSE":
-            response = json.dumps(rsp["PARAMETERS"])
+            if "ERROR" in rsp.keys():
+              response = json.dumps(rsp["ERROR"])
+            else:
+              response = json.dumps(rsp["PARAMETERS"])
             break
           elif rsp["STATUS"] == "ERROR":
             response = json.dumps(rsp)

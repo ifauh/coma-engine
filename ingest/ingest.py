@@ -47,7 +47,7 @@ else:
   requests_log.propagate = False
   requests_log.setLevel(logging.NOTSET)
 
-IMGFILE='description.csv'
+IMGFILE='image.csv'
 img_header = False
 if exists(IMGFILE):
   img_file = open(IMGFILE, 'a')
@@ -96,6 +96,8 @@ def LookupTelescope(telescope):
     return 1
   if telescope.startswith('cfht'):
     return 2
+  if telescope.startswith('ps1'):
+    return 3
   return 0
 
 def LookupInstrument(instrument):
@@ -103,6 +105,8 @@ def LookupInstrument(instrument):
     return 1
   elif instrument.startswith('cfht-megacam-one-chip'):
     return 2
+  elif instrument.startswith('ps1-chip-stamp'):
+    return 3
   return 0
 
 def MJDtoDate(mjd):
@@ -233,7 +237,7 @@ if response[cursor].status_code <= 202:
     guid = data['task']['id']
 
 data = {}
-while cursor < 20 and 'data' not in data:
+while cursor < 60 and 'data' not in data:
   API='https://coma.ifa.hawaii.edu/api/task/result/%s' %(guid)
   response.append(requests.get(API, verify=False))
   cursor+=1
@@ -290,7 +294,11 @@ if cal_header:
   cal_writer.writerow(header)
   cal_header = False
 
-cal_writer.writerow(CalibrationRow(args.id, description, calibration))
+print(calibration.keys())
+if calibration['TYPE'] == 'ERROR':
+  print("%s %s: %s" % (calibration['TYPE'], calibration['ERROR'], calibration['DESCRIPTION'])) 
+else:
+  cal_writer.writerow(CalibrationRow(args.id, description, calibration))
 
 def PhotometryRow(id, desc, photo):
   row = []
@@ -335,7 +343,7 @@ if response[cursor].status_code <= 202:
     guid = data['task']['id']
 
 data = {}
-while cursor < 30 and 'data' not in data:
+while cursor < 100 and 'data' not in data:
   API='https://coma.ifa.hawaii.edu/api/task/result/%s' %(guid)
   response.append(requests.get(API, verify=False))
   cursor+=1
@@ -372,9 +380,12 @@ if phot_header:
   phot_writer.writerow(header)
   phot_header = False
 
-rows = PhotometryRow(args.id, description, photometry)
-for row in rows:
-  phot_writer.writerow(row)
+if photometry['TYPE'] == 'ERROR':
+  print("%s %s: %s" % (photometry['TYPE'], photometry['ERROR'], photometry['DESCRIPTION'])) 
+else:
+  rows = PhotometryRow(args.id, description, photometry)
+  for row in rows:
+    phot_writer.writerow(row)
 
 ###############################################
 
